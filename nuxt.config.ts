@@ -20,6 +20,16 @@ export default defineNuxtConfig({
     },
   },
 
+  supabase: {
+    redirect: true,
+    redirectOptions: {
+      login: "/login",
+      callback: "/confirm",
+      include: ["/", "/dashboard(/*)?"],
+      exclude: ["/login", "/register"],
+    },
+  },
+
   modules: [
     "@nuxtjs/supabase",
     "@nuxt/icon",
@@ -44,6 +54,6 @@ export default defineNuxtConfig({
      * Directory that the component lives in.
      * @default "./components/ui"
      */
-    componentDir: "./components/ui",
+    componentDir: "./app/components/ui",
   },
 });
