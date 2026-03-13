@@ -11,7 +11,7 @@ export default defineNuxtConfig({
   css: ["~/assets/css/tailwind.css"],
 
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [tailwindcss() as any],
     vue: {
       script: {
         defineModel: true,
@@ -44,6 +44,13 @@ export default defineNuxtConfig({
      * Directory that the component lives in.
      * @default "./components/ui"
      */
-    componentDir: "./components/ui",
+    componentDir: "./app/components/ui",
+  },
+
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_API_KEY,
+    secretKey: process.env.SUPABASE_SECRET_KEY,
+    redirect: false
   },
 });
