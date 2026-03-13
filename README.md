@@ -64,6 +64,19 @@ Alternatively, you can import them manually:
 import { Button } from '@/components/ui/button'
 ```
 
+## Supabase Types
+
+This project uses the Supabase CLI to generate TypeScript types for your database schema. The types are stored in `app/types/database.types.ts`.
+
+### Generating Types
+To update your types after making changes to your local database schema (e.g., after a migration or adding functions), run:
+
+```bash
+pnpm update-types
+```
+
+*Note: This command assumes you have the [Supabase CLI](https://supabase.com/docs/guides/cli) installed and your local development stack is running (`supabase start`).*
+
 ## Development
 
 Make sure to install dependencies:
