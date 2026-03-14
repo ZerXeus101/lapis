@@ -35,7 +35,21 @@ export default defineNuxtConfig({
     "@nuxt/icon",
     "@nuxtjs/google-fonts",
     "shadcn-nuxt",
+    "@nuxtjs/color-mode",
   ],
+
+  googleFonts: {
+    families: {
+      Inter: [400, 500, 600, 700],
+    },
+    display: "swap",
+  },
+
+  colorMode: {
+    classSuffix: "",
+    preference: "dark",
+    fallback: "dark",
+  },
 
   components: [
     {
