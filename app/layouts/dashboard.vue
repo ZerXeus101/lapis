@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { 
   GraduationCap, 
   Bell, 
   User, 
+  Calendar,
   Settings, 
   FilePieChart, 
   LogOut,
@@ -32,22 +33,43 @@ import { toast } from 'vue-sonner'
 import { VisuallyHidden } from 'radix-vue'
 
 const { user, logout: authLogout } = useAuth()
+const supabase = useSupabaseClient()
 const isLogoutDialogOpen = ref(false)
 const isSheetOpen = ref(false)
+const isLoggingOut = ref(false)
 
 const handleLogout = async () => {
   try {
+    isLoggingOut.value = true
     await authLogout()
     toast.success('Successfully logged out')
   } catch (error) {
+    console.error('Logout error:', error)
     toast.error('Failed to log out')
   } finally {
     isLogoutDialogOpen.value = false
+    isLoggingOut.value = false
   }
 }
 
+// Global Auth Listener
+onMounted(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // This only catches UNINTENDED sign outs (like JWT expiration)
+    if (event === 'SIGNED_OUT' && !isLoggingOut.value) {
+      toast.error('Your session has expired. Please log in again.')
+    }
+  })
+
+  // Cleanup on unmount
+  onUnmounted(() => {
+    subscription.unsubscribe()
+  })
+})
+
 const navItems = [
   { label: 'Profile', icon: User, href: '/profile' },
+  { label: 'Calendar', icon: Calendar, href: '/calendar' },
   { label: 'Reports', icon: FilePieChart, href: '/reports' },
   { label: 'Settings', icon: Settings, href: '/settings' },
 ]
@@ -94,10 +116,12 @@ const navItems = [
             </SheetHeader>
 
             <div class="py-8 flex flex-col gap-2">
-              <Button v-for="item in navItems" :key="item.label" variant="ghost" class="w-full justify-start gap-3 h-12 text-base font-normal text-muted-foreground hover:text-foreground hover:bg-accent group">
-                <component :is="item.icon" class="w-5 h-5 group-hover:text-primary transition-colors" />
-                {{ item.label }}
-              </Button>
+              <NuxtLink v-for="item in navItems" :key="item.label" :to="item.href" @click="isSheetOpen = false">
+                <Button variant="ghost" class="w-full justify-start gap-3 h-12 text-base font-normal text-muted-foreground hover:text-foreground hover:bg-accent group">
+                  <component :is="item.icon" class="w-5 h-5 group-hover:text-primary transition-colors" />
+                  {{ item.label }}
+                </Button>
+              </NuxtLink>
               
               <div class="border-t border-border my-4 pt-4">
                 <Button 

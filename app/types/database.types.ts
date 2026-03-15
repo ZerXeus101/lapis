@@ -67,9 +67,11 @@ export type Database = {
           bio: string | null
           birthdate: string | null
           created_at: string
+          email_preference: boolean | null
           full_name: string | null
           id: number
           profile_pic_url: string | null
+          push_preference: boolean | null
           student_id: string
         }
         Insert: {
@@ -77,9 +79,11 @@ export type Database = {
           bio?: string | null
           birthdate?: string | null
           created_at?: string
+          email_preference?: boolean | null
           full_name?: string | null
           id?: number
           profile_pic_url?: string | null
+          push_preference?: boolean | null
           student_id: string
         }
         Update: {
@@ -87,9 +91,11 @@ export type Database = {
           bio?: string | null
           birthdate?: string | null
           created_at?: string
+          email_preference?: boolean | null
           full_name?: string | null
           id?: number
           profile_pic_url?: string | null
+          push_preference?: boolean | null
           student_id?: string
         }
         Relationships: []
@@ -110,11 +116,33 @@ export type Database = {
         }
         Returns: Json
       }
+      get_calendar_tasks: {
+        Args: { p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_dashboard_data:
         | { Args: never; Returns: Json }
         | { Args: { p_timezone_offset?: number }; Returns: Json }
+      get_profile_data: { Args: { p_timezone_offset?: number }; Returns: Json }
       toggle_task_status: {
         Args: { p_completed: boolean; p_task_id: number }
+        Returns: Json
+      }
+      update_task: {
+        Args: {
+          p_category: string
+          p_description?: string
+          p_due_date: string
+          p_due_time: string
+          p_status?: string
+          p_subject: string
+          p_task_id: number
+          p_task_name: string
+        }
+        Returns: Json
+      }
+      update_user_preferences: {
+        Args: { p_email: boolean; p_push: boolean }
         Returns: Json
       }
     }

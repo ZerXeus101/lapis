@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Plus, Calendar as CalendarIcon, Clock } from 'lucide-vue-next'
+import { ref, computed, watch } from 'vue'
+import { Plus, Pencil, Calendar as CalendarIcon, Clock } from 'lucide-vue-next'
 import { 
   Dialog, 
   DialogContent, 
@@ -23,11 +23,14 @@ import {
 
 const props = defineProps<{
   open: boolean
+  initialDate?: string
+  editTask?: any // If provided, we are in edit mode
 }>()
 
 const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'add', task: any): void
+  (e: 'update', task: any): void
 }>()
 
 const newTask = ref({
@@ -39,6 +42,35 @@ const newTask = ref({
   description: ''
 })
 
+const isEditMode = computed(() => !!props.editTask)
+
+// Sync data when dialog opens
+watch(() => props.open, (newVal) => {
+  if (newVal) {
+    if (props.editTask) {
+      // Pre-fill for edit
+      newTask.value = {
+        title: props.editTask.title || props.editTask.task_name || '',
+        category: props.editTask.category || 'Assignment',
+        dueDate: props.editTask.dueDate || props.editTask.due_date || '',
+        dueTime: props.editTask.dueTime || props.editTask.due_time || '',
+        subject: props.editTask.subject || '',
+        description: props.editTask.description || ''
+      }
+    } else {
+      // Reset for new task
+      newTask.value = {
+        title: '',
+        category: 'Assignment',
+        dueDate: props.initialDate || '',
+        dueTime: '',
+        subject: '',
+        description: ''
+      }
+    }
+  }
+}, { immediate: true })
+
 // Validation Logic
 const isValid = computed(() => {
   return (
@@ -49,20 +81,20 @@ const isValid = computed(() => {
   )
 })
 
-const handleAdd = () => {
+const handleSave = () => {
   if (!isValid.value) return
   
-  emit('add', { ...newTask.value, dueTime: newTask.value.dueTime || '23:59:59' })
-  
-  // Reset form
-  newTask.value = {
-    title: '',
-    category: 'Assignment',
-    dueDate: '',
-    dueTime: '',
-    subject: '',
-    description: ''
+  const payload = { 
+    ...newTask.value, 
+    dueTime: newTask.value.dueTime || '23:59:59' 
   }
+
+  if (isEditMode.value) {
+    emit('update', { ...payload, id: props.editTask.id })
+  } else {
+    emit('add', payload)
+  }
+  
   emit('update:open', false)
 }
 </script>
@@ -73,12 +105,12 @@ const handleAdd = () => {
       <DialogHeader>
         <DialogTitle class="text-xl font-bold flex items-center gap-2">
           <div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <Plus class="w-5 h-5 text-primary" />
+            <component :is="isEditMode ? Pencil : Plus" class="w-5 h-5 text-primary" />
           </div>
-          Create New Task
+          {{ isEditMode ? 'Edit Task' : 'Create New Task' }}
         </DialogTitle>
         <DialogDescription class="text-muted-foreground text-sm">
-          Required: Title, Category, Subject, and Due Date.
+          {{ isEditMode ? 'Update your task details below.' : 'Required: Title, Category, Subject, and Due Date.' }}
         </DialogDescription>
       </DialogHeader>
       
@@ -149,11 +181,11 @@ const handleAdd = () => {
       <DialogFooter class="gap-2 sm:gap-0">
         <Button variant="ghost" @click="emit('update:open', false)" class="text-muted-foreground hover:text-foreground">Cancel</Button>
         <Button 
-          @click="handleAdd" 
+          @click="handleSave" 
           :disabled="!isValid"
           class="bg-primary hover:bg-primary/90 text-primary-foreground px-6 shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed"
         >
-          Save Task
+          {{ isEditMode ? 'Update Task' : 'Save Task' }}
         </Button>
       </DialogFooter>
     </DialogContent>
