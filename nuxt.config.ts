@@ -20,12 +20,36 @@ export default defineNuxtConfig({
     },
   },
 
+  supabase: {
+    redirect: true,
+    redirectOptions: {
+      login: "/login",
+      callback: "/confirm",
+      include: ["/", "/dashboard(/*)?"],
+      exclude: ["/login", "/register"],
+    },
+  },
+
   modules: [
     "@nuxtjs/supabase",
     "@nuxt/icon",
     "@nuxtjs/google-fonts",
     "shadcn-nuxt",
+    "@nuxtjs/color-mode",
   ],
+
+  googleFonts: {
+    families: {
+      Inter: [400, 500, 600, 700],
+    },
+    display: "swap",
+  },
+
+  colorMode: {
+    classSuffix: "",
+    preference: "dark",
+    fallback: "dark",
+  },
 
   components: [
     {
@@ -45,12 +69,5 @@ export default defineNuxtConfig({
      * @default "./components/ui"
      */
     componentDir: "./app/components/ui",
-  },
-
-  supabase: {
-    url: process.env.SUPABASE_URL,
-    key: process.env.SUPABASE_API_KEY,
-    secretKey: process.env.SUPABASE_SECRET_KEY,
-    redirect: false
   },
 });
