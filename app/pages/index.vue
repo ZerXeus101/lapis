@@ -213,7 +213,7 @@ const filteredTasks = computed(() => {
           Add New Task
         </Button>
         <div class="grid grid-cols-2 gap-3">
-          <Button variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal">
+          <Button variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal" @click="navigateTo('/report')">
             <FileText class="w-4 h-4 mr-2" />
             View Report
           </Button>
