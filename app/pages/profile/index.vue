@@ -10,7 +10,6 @@ import InfoSection from '@/components/profile/InfoSection.vue'
 import PerformanceSection from '@/components/profile/PerformanceSection.vue'
 import QuickActions from '@/components/profile/QuickActions.vue'
 import DeadlinesSection from '@/components/profile/DeadlinesSection.vue'
-import PreferencesSection from '@/components/profile/PreferencesSection.vue'
 import StatCard from '@/components/dashboard/StatCard.vue'
 import TaskDialog from '@/components/dashboard/TaskDialog.vue'
 import { toast } from 'vue-sonner'
@@ -37,10 +36,6 @@ interface ProfileData {
     grade: string | null
     cover_photo_url: string | null
     email_address: string
-    preferences: {
-      email: boolean
-      push: boolean
-    }
   }
   stats: {
     total_tasks: number
@@ -107,29 +102,6 @@ const resolveAvatarUrl = (path: string | null | undefined) => {
   if (path.startsWith('http')) return path
   const { data } = supabase.storage.from('avatars').getPublicUrl(path)
   return data.publicUrl
-}
-
-const updatePreferences = async (newPrefs: { email: boolean; push: boolean }) => {
-  if (!profileData.value) return
-
-  // Optimistic update
-  const oldPrefs = { ...profileData.value.user.preferences }
-  profileData.value.user.preferences = newPrefs
-
-  try {
-    const { error } = await supabase.rpc('update_user_preferences', {
-      p_email: newPrefs.email,
-      p_push: newPrefs.push
-    })
-
-    if (error) throw error
-    toast.success('Preferences updated')
-  } catch (error: any) {
-    // Revert on error
-    profileData.value.user.preferences = oldPrefs
-    console.error('Error updating preferences:', error.message)
-    toast.error('Failed to update preferences')
-  }
 }
 
 const handleAddTask = async (newTask: any) => {
@@ -231,11 +203,10 @@ watch(authUser, (newUser) => {
         <PerformanceSection :categories="profileData.performance" />
       </div>
       
-      <!-- Right Column: Quick Actions, Deadlines, Preferences -->
+      <!-- Right Column: Quick Actions, Deadlines -->
       <aside class="lg:col-span-4 space-y-6">
         <QuickActions @add-task="isTaskDialogOpen = true" />
         <DeadlinesSection :deadlines="profileData.deadlines" />
-        <PreferencesSection :preferences="profileData.user.preferences" @update="updatePreferences" />
       </aside>
     </div>
 
