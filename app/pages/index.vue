@@ -25,12 +25,13 @@ import QuickAddTask, { type NewTask } from '@/components/dashboard/QuickAddTask.
 import CategoryList from '@/components/dashboard/CategoryList.vue'
 import WeeklyProgress from '@/components/dashboard/WeeklyProgress.vue'
 import TaskDialog from '@/components/dashboard/TaskDialog.vue'
+import AiCreateDialog from '@/components/dashboard/AiCreateDialog.vue'
 
 definePageMeta({
   layout: 'dashboard'
 })
 
-const { user } = useAuth()
+const { user, handleAuthError } = useAuth()
 const supabase = useSupabaseClient<Database>()
 
 // Dashboard Data Interface
@@ -51,6 +52,8 @@ const dashboardData = ref<DashboardData | null>(null)
 const tasks = ref<Task[]>([])
 const activeTab = ref('all')
 const isTaskDialogOpen = ref(false)
+const isAiDialogOpen = ref(false)
+const editingTask = ref<Task | null>(null)
 const hideCompleted = ref(false)
 
 // Icon Mapping
@@ -68,13 +71,10 @@ const fetchDashboard = async () => {
     const { data, error } = await supabase.rpc('get_dashboard_data', { p_timezone_offset: offset })
     
     if (error) {
-      // If session is expired, kick to login
-      if (error.message?.includes('JWT expired')) {
-        const { logout } = useAuth()
-        await logout()
-        toast.error('Your session has expired. Please log in again.')
-        return
-      }
+      // Proactively handle session expiration
+      const wasExpired = await handleAuthError(error)
+      if (wasExpired) return
+      
       throw error
     }
 
@@ -87,6 +87,16 @@ const fetchDashboard = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const openAddDialog = () => {
+  editingTask.value = null
+  isTaskDialogOpen.value = true
+}
+
+const openEditDialog = (task: Task) => {
+  editingTask.value = task
+  isTaskDialogOpen.value = true
 }
 
 const handleAddTask = async (newTask: any) => {
@@ -111,6 +121,33 @@ const handleAddTask = async (newTask: any) => {
       return 'Task created successfully!'
     },
     error: (err: any) => `Error: ${err.message || 'Could not create task'}`
+  })
+}
+
+const handleUpdateTask = async (updatedTask: any) => {
+  const updateTaskPromise = async () => {
+    const { data, error } = await supabase.rpc('update_task', {
+      p_task_id: updatedTask.id,
+      p_task_name: updatedTask.title,
+      p_category: updatedTask.category,
+      p_due_date: updatedTask.dueDate,
+      p_due_time: updatedTask.dueTime,
+      p_subject: updatedTask.subject,
+      p_description: updatedTask.description,
+      p_status: editingTask.value?.completed ? 'completed' : 'pending'
+    })
+
+    if (error) throw error
+    return data
+  }
+
+  toast.promise(updateTaskPromise(), {
+    loading: 'Updating task...',
+    success: () => {
+      fetchDashboard()
+      return 'Task updated successfully!'
+    },
+    error: (err: any) => `Error: ${err.message || 'Could not update task'}`
   })
 }
 
@@ -208,7 +245,7 @@ const filteredTasks = computed(() => {
       </section>
 
       <section class="bg-card border border-border rounded-xl p-4 grid grid-cols-1 gap-3 shadow-sm">
-        <Button @click="isTaskDialogOpen = true" class="bg-primary hover:bg-primary/90 text-primary-foreground h-12 rounded-lg text-base font-medium transition-colors shadow-md shadow-primary/20">
+        <Button @click="openAddDialog" class="bg-primary hover:bg-primary/90 text-primary-foreground h-12 rounded-lg text-base font-medium transition-colors shadow-md shadow-primary/20">
           <Plus class="w-4 h-4 mr-2" />
           Add New Task
         </Button>
@@ -217,9 +254,9 @@ const filteredTasks = computed(() => {
             <FileText class="w-4 h-4 mr-2" />
             View Report
           </Button>
-          <Button variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal">
+          <Button @click="isAiDialogOpen = true" variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal">
             <Wand2 class="w-4 h-4 mr-2" />
-            Summarize
+            AI Create
           </Button>
         </div>
       </section>
@@ -261,7 +298,7 @@ const filteredTasks = computed(() => {
             </div>
 
             <TabsContent value="all" class="mt-0 space-y-4">
-              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" />
+              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @edit="openEditDialog" />
               <div v-if="filteredTasks.length === 0" class="py-12 text-center text-muted-foreground bg-card/50 rounded-xl border border-dashed border-border">
                 <p class="text-lg font-medium text-foreground mb-1">No tasks found</p>
                 <p class="text-sm">Either you're all caught up or your filters are too strict!</p>
@@ -269,7 +306,7 @@ const filteredTasks = computed(() => {
             </TabsContent>
             
             <TabsContent v-for="cat in categories" :key="cat.name" :value="cat.name.toLowerCase() + 's'" class="mt-0 space-y-4">
-              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" />
+              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @edit="openEditDialog" />
               <div v-if="filteredTasks.length === 0" class="py-12 text-center text-muted-foreground bg-card/50 rounded-xl border border-dashed border-border">
                 <p class="text-lg font-medium text-foreground mb-1">No tasks here</p>
                 <p class="text-sm">Try disabling "Hide Completed" or add a new task.</p>
@@ -289,13 +326,14 @@ const filteredTasks = computed(() => {
 
     <!-- FAB for mobile -->
     <div class="md:hidden fixed bottom-6 right-6 z-50">
-      <Button @click="isTaskDialogOpen = true" class="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-2xl flex items-center justify-center p-0 transition-transform active:scale-95 shadow-primary/40">
+      <Button @click="openAddDialog" class="w-14 h-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-2xl flex items-center justify-center p-0 transition-transform active:scale-95 shadow-primary/40">
         <Plus class="w-6 h-6" />
       </Button>
     </div>
 
     <!-- Modals -->
-    <TaskDialog v-model:open="isTaskDialogOpen" @add="handleAddTask" />
+    <TaskDialog v-model:open="isTaskDialogOpen" :edit-task="editingTask" @add="handleAddTask" @update="handleUpdateTask" />
+    <AiCreateDialog v-model:open="isAiDialogOpen" @created="fetchDashboard" />
   </main>
   
   <div v-else class="flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]">
