@@ -5,7 +5,7 @@ import 'vue-sonner/style.css' // Required for vue-sonner to function correctly
 const colorMode = useColorMode()
 const { user } = useAuth()
 const { fetchProfile } = useProfile()
-const { $pwa } = useNuxtApp()
+const { $pwa } = useNuxtApp() as any
 
 const siteName = 'Lapis'
 const siteDescription = 'A modern Nuxt 4 note taking app utilizing Tailwind CSS v4 and shadcn-vue.'
