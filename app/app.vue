@@ -3,16 +3,25 @@ import { Toaster } from '@/components/ui/sonner'
 import 'vue-sonner/style.css' // Required for vue-sonner to function correctly
 
 const colorMode = useColorMode()
+const { user } = useAuth()
+const { fetchProfile } = useProfile()
 
 const siteName = 'Lapis'
-const siteDescription = 'A modern Nuxt 4 starter template utilizing Tailwind CSS v4 and shadcn-vue.'
-const faviconPath = '/favicon.ico'
+const siteDescription = 'A modern Nuxt 4 note taking app utilizing Tailwind CSS v4 and shadcn-vue.'
+const faviconPath = '/lapis_logo.png'
+
+// Global profile sync: ensuring the avatar is always fetched when a user is logged in
+watch(user, (newUser) => {
+  if (newUser) {
+    fetchProfile(false, newUser)
+  }
+}, { immediate: true })
 
 useHead({
   title: siteName,
   titleTemplate: (title) => title ? `${title} | ${siteName}` : siteName,
   link: [
-    { rel: 'icon', type: 'image/x-icon', href: faviconPath }
+    { rel: 'icon', type: 'image/png', href: faviconPath }
   ],
   htmlAttrs: {
     lang: 'en'

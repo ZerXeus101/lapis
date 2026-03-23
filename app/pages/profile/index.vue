@@ -34,8 +34,8 @@ interface ProfileData {
     birthdate: string | null
     bio: string | null
     avatar_url: string | null
+    grade: string | null
     cover_photo_url: string | null
-    profile_pic_url: string | null
     email_address: string
     preferences: {
       email: boolean
@@ -91,7 +91,8 @@ const fetchProfileData = async () => {
     
     // Sync shared profile state for header
     sharedProfile.value.full_name = profileData.value.user.full_name || ''
-    sharedProfile.value.avatar_url = resolveAvatarUrl(profileData.value.user.avatar_url || profileData.value.user.profile_pic_url)
+    sharedProfile.value.avatar_url = resolveAvatarUrl(profileData.value.user.avatar_url)
+    sharedProfile.value.fetched = true
   } catch (error: any) {
     console.error('Error fetching profile data:', error.message)
     toast.error('Failed to load profile information')
@@ -161,7 +162,7 @@ const heroUser = computed(() => {
   if (!profileData.value?.user) return null
   
   const resolvedAvatar = resolveAvatarUrl(
-    profileData.value.user.avatar_url || profileData.value.user.profile_pic_url
+    profileData.value.user.avatar_url
   )
 
   const resolvedCover = resolveCoverPhotoUrl(

@@ -5,11 +5,12 @@ export const useProfile = () => {
   const user = useSupabaseUser()
   const { handleAuthError } = useAuth()
   
-  // Shared state
+  // Shared state: singleton-like across the app
   const profile = useState('profile-data', () => ({
     full_name: '',
     avatar_url: null as string | null,
-    loading: true
+    loading: false,
+    fetched: false
   }))
 
   const resolveAvatarUrl = (path: string | null | undefined) => {
@@ -19,44 +20,73 @@ export const useProfile = () => {
     return data.publicUrl
   }
 
-  const fetchProfile = async (force = false) => {
-    if (!user.value?.id) return
-    if (!force && profile.value.full_name) return // Already fetched
+  const fetchProfile = async (force = false, currentUser = user.value) => {
+    const userId = currentUser?.id || (currentUser as any)?.sub
+    
+    if (!userId || (!force && profile.value.fetched)) {
+      return
+    }
 
     try {
       profile.value.loading = true
-      // We fetch the basic user info from the public.User table
-      const { data, error } = await supabase
-        .from('User')
-        .select('full_name, avatar_url, profile_pic_url')
-        .eq('auth_uid', user.value.id)
-        .maybeSingle() // Use maybeSingle to avoid errors if user doesn't exist yet
+      
+      const { data, error } = await supabase.rpc('get_user_avatar')
 
       if (error) {
-        const wasExpired = await handleAuthError(error)
-        if (wasExpired) return
-        throw error
-      }
+        const { data: directData, error: directError } = await supabase
+          .from('User')
+          .select('full_name, avatar_url')
+          .eq('auth_uid', userId)
+          .maybeSingle()
 
-      if (data) {
-        profile.value.full_name = data.full_name || ''
-        profile.value.avatar_url = resolveAvatarUrl(data.avatar_url || data.profile_pic_url)
+        if (directError) {
+          const wasExpired = await handleAuthError(directError)
+          if (wasExpired) return
+          throw directError
+        }
+
+        if (directData) {
+          profile.value.full_name = directData.full_name || ''
+          profile.value.avatar_url = resolveAvatarUrl(directData.avatar_url)
+          profile.value.fetched = true
+        }
+      } else if (data) {
+        const userData = data as any
+        profile.value.full_name = userData.full_name || ''
+        profile.value.avatar_url = resolveAvatarUrl(userData.avatar_url)
+        profile.value.fetched = true
       }
     } catch (e) {
-      console.error('Error fetching profile for sync:', e)
+      console.error('Error syncing profile:', e)
     } finally {
       profile.value.loading = false
     }
   }
 
-  // Watch for user changes (e.g. after login)
-  watch(user, (newUser) => {
-    if (newUser?.id) fetchProfile()
-  }, { immediate: true })
+  // Self-healing: Watch for user changes internally
+  if (import.meta.client) {
+    watch(user, (newUser) => {
+      const userId = newUser?.id || (newUser as any)?.sub
+      if (userId && !profile.value.fetched) {
+        fetchProfile(false, newUser)
+      }
+    }, { immediate: true })
+  }
+
+  // Clear profile data (useful on logout)
+  const clearProfile = () => {
+    profile.value = {
+      full_name: '',
+      avatar_url: null,
+      loading: false,
+      fetched: false
+    }
+  }
 
   return {
     profile,
     fetchProfile,
-    resolveAvatarUrl
+    resolveAvatarUrl,
+    clearProfile
   }
 }

@@ -26,7 +26,7 @@ const isSheetOpen = ref(false)
 const navItems = [
   { label: 'Profile', icon: User, href: '/profile' },
   { label: 'Calendar', icon: Calendar, href: '/calendar' },
-  { label: 'Reports', icon: FilePieChart, href: '/reports' },
+  { label: 'Reports', icon: FilePieChart, href: '/report' },
 ]
 
 const emit = defineEmits<{
@@ -37,8 +37,8 @@ const emit = defineEmits<{
 <template>
   <header class="h-16 bg-card border-b border-border flex items-center justify-between px-4 sticky top-0 z-50">
     <div class="flex items-center gap-3">
-      <NuxtLink to="/" class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground transition-transform hover:scale-105 active:scale-95">
-        <GraduationCap class="w-6 h-6" />
+      <NuxtLink to="/" class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-primary-foreground transition-transform hover:scale-105 active:scale-95 overflow-hidden">
+        <img src="/lapis_logo.png" alt="Lapis Logo" class="w-full h-full object-cover" />
       </NuxtLink>
     </div>
     
