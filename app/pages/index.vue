@@ -25,12 +25,13 @@ import QuickAddTask, { type NewTask } from '@/components/dashboard/QuickAddTask.
 import CategoryList from '@/components/dashboard/CategoryList.vue'
 import WeeklyProgress from '@/components/dashboard/WeeklyProgress.vue'
 import TaskDialog from '@/components/dashboard/TaskDialog.vue'
+import AiCreateDialog from '@/components/dashboard/AiCreateDialog.vue'
 
 definePageMeta({
   layout: 'dashboard'
 })
 
-const { user } = useAuth()
+const { user, handleAuthError } = useAuth()
 const supabase = useSupabaseClient<Database>()
 
 // Dashboard Data Interface
@@ -51,6 +52,7 @@ const dashboardData = ref<DashboardData | null>(null)
 const tasks = ref<Task[]>([])
 const activeTab = ref('all')
 const isTaskDialogOpen = ref(false)
+const isAiDialogOpen = ref(false)
 const editingTask = ref<Task | null>(null)
 const hideCompleted = ref(false)
 
@@ -69,13 +71,10 @@ const fetchDashboard = async () => {
     const { data, error } = await supabase.rpc('get_dashboard_data', { p_timezone_offset: offset })
     
     if (error) {
-      // If session is expired, kick to login
-      if (error.message?.includes('JWT expired')) {
-        const { logout } = useAuth()
-        await logout()
-        toast.error('Your session has expired. Please log in again.')
-        return
-      }
+      // Proactively handle session expiration
+      const wasExpired = await handleAuthError(error)
+      if (wasExpired) return
+      
       throw error
     }
 
@@ -255,9 +254,9 @@ const filteredTasks = computed(() => {
             <FileText class="w-4 h-4 mr-2" />
             View Report
           </Button>
-          <Button variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal">
+          <Button @click="isAiDialogOpen = true" variant="outline" class="border-input hover:bg-accent hover:text-accent-foreground h-12 rounded-lg text-base font-normal">
             <Wand2 class="w-4 h-4 mr-2" />
-            Summarize
+            AI Create
           </Button>
         </div>
       </section>
@@ -299,7 +298,7 @@ const filteredTasks = computed(() => {
             </div>
 
             <TabsContent value="all" class="mt-0 space-y-4">
-              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @click="openEditDialog(task)" />
+              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @edit="openEditDialog" />
               <div v-if="filteredTasks.length === 0" class="py-12 text-center text-muted-foreground bg-card/50 rounded-xl border border-dashed border-border">
                 <p class="text-lg font-medium text-foreground mb-1">No tasks found</p>
                 <p class="text-sm">Either you're all caught up or your filters are too strict!</p>
@@ -307,7 +306,7 @@ const filteredTasks = computed(() => {
             </TabsContent>
             
             <TabsContent v-for="cat in categories" :key="cat.name" :value="cat.name.toLowerCase() + 's'" class="mt-0 space-y-4">
-              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @click="openEditDialog(task)" />
+              <TaskCard v-for="task in filteredTasks" :key="task.id" :task="task" @update:completed="toggleTaskCompletion" @edit="openEditDialog" />
               <div v-if="filteredTasks.length === 0" class="py-12 text-center text-muted-foreground bg-card/50 rounded-xl border border-dashed border-border">
                 <p class="text-lg font-medium text-foreground mb-1">No tasks here</p>
                 <p class="text-sm">Try disabling "Hide Completed" or add a new task.</p>
@@ -334,6 +333,7 @@ const filteredTasks = computed(() => {
 
     <!-- Modals -->
     <TaskDialog v-model:open="isTaskDialogOpen" :edit-task="editingTask" @add="handleAddTask" @update="handleUpdateTask" />
+    <AiCreateDialog v-model:open="isAiDialogOpen" @created="fetchDashboard" />
   </main>
   
   <div v-else class="flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]">

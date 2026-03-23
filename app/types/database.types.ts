@@ -64,39 +64,48 @@ export type Database = {
       User: {
         Row: {
           auth_uid: string
+          avatar_url: string | null
           bio: string | null
           birthdate: string | null
+          cover_photo_url: string | null
           created_at: string
           email_preference: boolean | null
           full_name: string | null
+          grade: string | null
           id: number
           profile_pic_url: string | null
           push_preference: boolean | null
-          student_id: string
+          student_id: string | null
         }
         Insert: {
           auth_uid?: string
+          avatar_url?: string | null
           bio?: string | null
           birthdate?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           email_preference?: boolean | null
           full_name?: string | null
+          grade?: string | null
           id?: number
           profile_pic_url?: string | null
           push_preference?: boolean | null
-          student_id: string
+          student_id?: string | null
         }
         Update: {
           auth_uid?: string
+          avatar_url?: string | null
           bio?: string | null
           birthdate?: string | null
+          cover_photo_url?: string | null
           created_at?: string
           email_preference?: boolean | null
           full_name?: string | null
+          grade?: string | null
           id?: number
           profile_pic_url?: string | null
           push_preference?: boolean | null
-          student_id?: string
+          student_id?: string | null
         }
         Relationships: []
       }
@@ -124,10 +133,35 @@ export type Database = {
         | { Args: never; Returns: Json }
         | { Args: { p_timezone_offset?: number }; Returns: Json }
       get_profile_data: { Args: { p_timezone_offset?: number }; Returns: Json }
+      get_report_data: { Args: { days: number }; Returns: Json }
       toggle_task_status: {
         Args: { p_completed: boolean; p_task_id: number }
         Returns: Json
       }
+      update_profile:
+        | {
+            Args: {
+              p_avatar_url?: string
+              p_bio?: string
+              p_birthdate?: string
+              p_cover_photo_url?: string
+              p_full_name?: string
+              p_student_id?: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_avatar_url?: string
+              p_bio?: string
+              p_birthdate?: string
+              p_cover_photo_url?: string
+              p_full_name?: string
+              p_grade?: string
+              p_student_id?: string
+            }
+            Returns: Json
+          }
       update_task: {
         Args: {
           p_category: string

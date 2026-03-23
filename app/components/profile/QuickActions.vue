@@ -3,7 +3,6 @@ import {
   Plus, 
   FileText, 
   Calendar, 
-  Settings,
   ChevronRight 
 } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -17,7 +16,6 @@ const actions = [
   { label: 'Add New Task', icon: Plus, action: () => emit('add-task') },
   { label: 'View Reports', icon: FileText, href: '#' },
   { label: 'Calendar View', icon: Calendar, href: '/calendar' },
-  { label: 'Settings', icon: Settings, href: '#' },
 ]
 </script>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar, Clock, BookOpen, AlertCircle, CheckCircle2, History } from 'lucide-vue-next'
+import { Calendar, Clock, BookOpen, AlertCircle, CheckCircle2, History, Pencil, Check } from 'lucide-vue-next'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -23,10 +23,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:completed', id: number | string, value: boolean): void
+  (e: 'edit', task: Task): void
 }>()
 
 const onCheckedChange = (checked: boolean) => {
   emit('update:completed', props.task.id, checked)
+}
+
+const onEditClick = (e: Event) => {
+  e.stopPropagation()
+  emit('edit', props.task)
 }
 
 // Due Today logic (Fallback to frontend check for today)
@@ -65,20 +71,33 @@ const dateTextStyles = computed(() => {
 
     <Checkbox 
       :model-value="task.completed" 
-      class="w-6 h-6 border-2 border-input rounded-md data-[state=checked]:bg-primary data-[state=checked]:border-primary mt-0.5 shrink-0 transition-all cursor-pointer z-10"
+      class="w-10 h-10 border-2 border-input rounded-md data-[state=checked]:bg-primary data-[state=checked]:border-primary mt-0.5 shrink-0 transition-all cursor-pointer z-10"
       @update:model-value="onCheckedChange"
-    />
+      @click.stop
+    >
+      <Check class="w-6 h-6" />
+    </Checkbox>
     
     <div class="flex-1 min-w-0 space-y-3 z-10">
       <div class="space-y-1">
         <div class="flex items-start justify-between gap-2">
-          <h3 :class="cn(
-            'font-bold text-base tracking-tight truncate transition-all duration-300',
-            task.completed ? 'line-through text-muted-foreground' : 'text-foreground',
-            !task.completed && task.overdue ? 'text-destructive' : ''
-          )">
-            {{ task.title }}
-          </h3>
+          <div class="flex items-center gap-2 min-w-0">
+            <h3 :class="cn(
+              'font-bold text-base tracking-tight truncate transition-all duration-300',
+              task.completed ? 'line-through text-muted-foreground' : 'text-foreground',
+              !task.completed && task.overdue ? 'text-destructive' : ''
+            )">
+              {{ task.title }}
+            </h3>
+            <button 
+              v-if="!task.completed"
+              @click="onEditClick"
+              class="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-all md:opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0"
+              title="Edit task"
+            >
+              <Pencil class="w-3.5 h-3.5" />
+            </button>
+          </div>
           
           <!-- Urgent Icons -->
           <div v-if="!task.completed" class="shrink-0 flex gap-1">

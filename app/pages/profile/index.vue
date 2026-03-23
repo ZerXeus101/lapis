@@ -20,7 +20,8 @@ definePageMeta({
   layout: 'dashboard'
 })
 
-const { user: authUser } = useAuth()
+const { user: authUser, handleAuthError } = useAuth()
+const { profile: sharedProfile, fetchProfile: syncHeaderProfile } = useProfile()
 const supabase = useSupabaseClient<Database>()
 const loading = ref(true)
 const isTaskDialogOpen = ref(false)
@@ -32,6 +33,8 @@ interface ProfileData {
     student_id: string
     birthdate: string | null
     bio: string | null
+    avatar_url: string | null
+    cover_photo_url: string | null
     profile_pic_url: string | null
     email_address: string
     preferences: {
@@ -59,6 +62,16 @@ interface ProfileData {
 
 const profileData = ref<ProfileData | null>(null)
 
+/**
+ * Resolves the full URL for a cover photo from Supabase storage or external URL
+ */
+const resolveCoverPhotoUrl = (path: string | null | undefined) => {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  const { data } = supabase.storage.from('cover_photos').getPublicUrl(path)
+  return data.publicUrl
+}
+
 const fetchProfileData = async () => {
   try {
     loading.value = true
@@ -68,15 +81,31 @@ const fetchProfileData = async () => {
       p_timezone_offset: offset 
     })
 
-    if (error) throw error
+    if (error) {
+      const wasExpired = await handleAuthError(error)
+      if (wasExpired) return
+      throw error
+    }
     
     profileData.value = data as unknown as ProfileData
+    
+    // Sync shared profile state for header
+    sharedProfile.value.full_name = profileData.value.user.full_name || ''
+    sharedProfile.value.avatar_url = resolveAvatarUrl(profileData.value.user.avatar_url || profileData.value.user.profile_pic_url)
   } catch (error: any) {
     console.error('Error fetching profile data:', error.message)
     toast.error('Failed to load profile information')
   } finally {
     loading.value = false
   }
+}
+
+// Helper for local resolution if needed, though we should prefer the shared one
+const resolveAvatarUrl = (path: string | null | undefined) => {
+  if (!path) return null
+  if (path.startsWith('http')) return path
+  const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+  return data.publicUrl
 }
 
 const updatePreferences = async (newPrefs: { email: boolean; push: boolean }) => {
@@ -130,11 +159,22 @@ const handleAddTask = async (newTask: any) => {
 // Map database fields to component props
 const heroUser = computed(() => {
   if (!profileData.value?.user) return null
+  
+  const resolvedAvatar = resolveAvatarUrl(
+    profileData.value.user.avatar_url || profileData.value.user.profile_pic_url
+  )
+
+  const resolvedCover = resolveCoverPhotoUrl(
+    profileData.value.user.cover_photo_url
+  )
+
   return {
     name: profileData.value.user.full_name || 'Student',
-    grade: '11',
+    grade: profileData.value.user.grade || 'N/A',
     studentId: profileData.value.user.student_id || 'N/A',
-    avatarUrl: profileData.value.user.profile_pic_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.value.user.full_name}`
+    avatarUrl: resolvedAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profileData.value.user.full_name}`,
+    coverPhotoUrl: resolvedCover,
+    bio: profileData.value.user.bio
   }
 })
 
@@ -143,9 +183,10 @@ const infoData = computed(() => {
   return {
     fullName: profileData.value.user.full_name || 'N/A',
     email: profileData.value.user.email_address || 'N/A',
-    gradeLevel: 'Grade 11',
+    gradeLevel: profileData.value.user.grade || 'N/A',
     studentId: profileData.value.user.student_id || 'N/A',
-    dateOfBirth: profileData.value.user.birthdate ? new Date(profileData.value.user.birthdate).toLocaleDateString() : 'N/A'
+    dateOfBirth: profileData.value.user.birthdate ? new Date(profileData.value.user.birthdate).toLocaleDateString() : 'N/A',
+    bio: profileData.value.user.bio
   }
 })
 
