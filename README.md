@@ -1,93 +1,34 @@
-# Lapis - Nuxt 4 + Tailwind v4 + shadcn-vue
+# Lapis
 
-A modern Nuxt 4 starter template utilizing Tailwind CSS v4 and shadcn-vue.
+Lapis is a modern, high-performance task management and note-taking application designed to streamline your productivity. Built with the latest web technologies, Lapis offers a seamless, fast, and interactive experience across all your devices.
 
-## Project Setup
+## What is Lapis?
 
-This project uses the **Nuxt 4 directory structure** (with everything inside the `app/` directory) and the latest **Tailwind CSS v4**.
+Lapis is more than just a task list; it's a comprehensive workspace for your daily goals, long-term projects, and personal performance tracking. Whether you're a student, professional, or lifelong learner, Lapis provides the tools to stay organized and achieve your best.
 
-### Key Technologies
-- **Nuxt 4:** Enabled via `future: { compatibilityVersion: 4 }` in `nuxt.config.ts`.
-- **Tailwind CSS v4:** Integrated using `@tailwindcss/vite`.
-- **shadcn-vue:** UI component library built on Radix Vue.
-- **Supabase:** Integrated for backend and authentication.
-- **Iconify:** Using `@nuxt/icon` for flexible icon support.
+## Key Features
 
-## Notable Setup Details
+- **🚀 Smart Dashboard**: Get a birds-eye view of your productivity with interactive charts, weekly progress trackers, and quick-access stat cards.
+- **🤖 AI Task Generation**: Leverage built-in AI to brainstorm and break down complex projects into manageable, actionable tasks.
+- **📅 Visual Calendar**: Manage your schedule with ease using the intuitive calendar view, perfect for tracking deadlines and time-sensitive goals.
+- **📊 Performance Reports**: Gain insights into your habits with detailed reporting. Track performance by subject or category using beautiful, responsive charts.
+- **📱 Progressive Web App (PWA)**: Install Lapis directly on your mobile device or desktop. Enjoy an app-like experience with offline capabilities and lightning-fast load times.
+- **🌙 Theme Support**: Dark mode by default, designed to be easy on the eyes during long sessions.
+- **🔒 Secure Authentication**: Robust and secure user accounts powered by Supabase.
 
-### 1. Tailwind v4 Integration
-Unlike Tailwind v3, v4 is integrated directly via a Vite plugin. The configuration lives in `app/assets/css/tailwind.css` using the new `@theme` block instead of a separate `tailwind.config.js` file.
+## Tech Stack
 
-### 2. shadcn-vue & Nuxt 4 Compatibility
-We encountered a specific issue when using shadcn-vue components with Nuxt 4 and the Vue SFC compiler.
+Lapis is built on the cutting edge of modern web development:
+- **Nuxt 4**: The latest and greatest version of the Vue framework.
+- **Tailwind CSS v4**: Blazing fast, utility-first styling.
+- **shadcn-vue**: Beautiful, accessible, and highly customizable UI components.
+- **Supabase**: Real-time database and secure authentication.
+- **Unovis**: Powerful and flexible charting for your productivity data.
 
-**Problem:**
-When a component interface `extends` an external type (like `PrimitiveProps` from `radix-vue`), the Vue compiler fails to statically resolve the base type, leading to an error: `Failed to resolve extends base type`.
+## Development & Setup
 
-**Reason:**
-This is due to how the Vue SFC compiler analyzes types in a Nuxt 4 `app/` directory structure. It cannot always correctly "crawl" into `node_modules` to find the source interfaces for static prop analysis.
-
-**Current Solution:**
-To resolve this, we use the `/* @vue-ignore */` comment before the extended interface. This tells the Vue compiler to skip static analysis for those specific base types and treat them as fallthrough attributes at runtime.
-
-Example:
-```typescript
-interface Props extends /* @vue-ignore */ PrimitiveProps {
-  variant?: ButtonVariants['variant']
-  // ...
-}
-```
-
-## Installation & Usage
-
-### Installing Components
-To add new shadcn components, use the following command:
-
-```bash
-pnpm dlx shadcn-vue@latest add [component-name]
-```
-
-This will automatically place the component in `app/components/ui/`.
-
-### Using Components
-Nuxt 4 is configured to auto-import these components. You can use them directly in your templates:
-
-```vue
-<template>
-  <Button>Click me</Button>
-  <Badge>New</Badge>
-</template>
-```
-
-Alternatively, you can import them manually:
-```typescript
-import { Button } from '@/components/ui/button'
-```
-
-## Supabase Types
-
-This project uses the Supabase CLI to generate TypeScript types for your database schema. The types are stored in `app/types/database.types.ts`.
-
-### Generating Types
-To update your types after making changes to your local database schema (e.g., after a migration or adding functions), run:
-
-```bash
-pnpm update-types
-```
-
-*Note: This command assumes you have the [Supabase CLI](https://supabase.com/docs/guides/cli) installed and your local development stack is running (`supabase start`).*
-
-## Development
-
-Make sure to install dependencies:
-```bash
-pnpm install
-```
-
-Start the development server:
-```bash
-pnpm dev
-```
+For detailed instructions on how to set up the project locally, install dependencies, and contribute, please refer to our **[Development Guide (DEVELOPMENT.md)](./DEVELOPMENT.md)**.
 
 ## License
-MIT
+
+MIT - Feel free to use and build upon Lapis!

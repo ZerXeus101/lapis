@@ -1,14 +1,32 @@
 <script setup lang="ts">
-import { Toaster } from '@/components/ui/sonner'
+import { Toaster, toast } from '@/components/ui/sonner'
 import 'vue-sonner/style.css' // Required for vue-sonner to function correctly
 
 const colorMode = useColorMode()
 const { user } = useAuth()
 const { fetchProfile } = useProfile()
+const { $pwa } = useNuxtApp() as any
 
 const siteName = 'Lapis'
 const siteDescription = 'A modern Nuxt 4 note taking app utilizing Tailwind CSS v4 and shadcn-vue.'
 const faviconPath = '/lapis_logo.png'
+
+// PWA: Show update prompt when a new version is available
+onMounted(() => {
+  if ($pwa?.needRefresh) {
+    watch(() => $pwa.needRefresh, (needRefresh) => {
+      if (needRefresh) {
+        toast.info('New content available, click to update', {
+          duration: Infinity,
+          action: {
+            label: 'Update',
+            onClick: () => $pwa.updateServiceWorker()
+          }
+        })
+      }
+    }, { immediate: true })
+  }
+})
 
 // Global profile sync: ensuring the avatar is always fetched when a user is logged in
 watch(user, (newUser) => {
@@ -21,7 +39,11 @@ useHead({
   title: siteName,
   titleTemplate: (title) => title ? `${title} | ${siteName}` : siteName,
   link: [
-    { rel: 'icon', type: 'image/png', href: faviconPath }
+    { rel: 'icon', type: 'image/png', href: faviconPath },
+    { rel: 'apple-touch-icon', href: faviconPath }
+  ],
+  meta: [
+    { name: 'theme-color', content: '#ffffff' }
   ],
   htmlAttrs: {
     lang: 'en'

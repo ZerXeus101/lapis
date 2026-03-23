@@ -23,6 +23,12 @@ logs
 .env.*
 !.env.example
 
+# PWA
+public/sw.js
+public/sw.js.map
+public/workbox-*.js
+public/manifest.webmanifest
+
 # IDE / Editor configurations
 .vscode
 .gemini
