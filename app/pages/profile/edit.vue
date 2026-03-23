@@ -80,7 +80,7 @@ const fetchProfileToEdit = async () => {
       grade: profileData.user.grade || '',
       birthdate: profileData.user.birthdate || '',
       bio: profileData.user.bio || '',
-      avatar_url: profileData.user.avatar_url || profileData.user.profile_pic_url,
+      avatar_url: profileData.user.avatar_url,
       cover_photo_url: profileData.user.cover_photo_url || null,
       email_address: profileData.user.email_address || authUser.value.email || ''
     }

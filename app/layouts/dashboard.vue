@@ -14,6 +14,7 @@ import { toast } from 'vue-sonner'
 import TheHeader from '@/components/layout/TheHeader.vue'
 
 const { user, logout: authLogout } = useAuth()
+const { fetchProfile, clearProfile } = useProfile()
 const router = useRouter()
 const supabase = useSupabaseClient()
 const isLogoutDialogOpen = ref(false)
@@ -25,6 +26,7 @@ watch(user, (newUser) => {
     // Only kick if we aren't already on the login page or registering
     if (!['/login', '/register'].includes(router.currentRoute.value.path)) {
       console.warn('User lost session. Kicking to login...')
+      clearProfile()
       router.push('/login')
       toast.error('Session expired. Please log in again.')
     }
@@ -35,6 +37,7 @@ const handleLogout = async () => {
   try {
     isLoggingOut.value = true
     await authLogout()
+    clearProfile() // Clear local profile state immediately
     toast.success('Successfully logged out')
   } catch (error) {
     console.error('Logout error:', error)

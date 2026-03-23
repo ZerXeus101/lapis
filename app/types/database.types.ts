@@ -134,6 +134,7 @@ export type Database = {
         | { Args: { p_timezone_offset?: number }; Returns: Json }
       get_profile_data: { Args: { p_timezone_offset?: number }; Returns: Json }
       get_report_data: { Args: { days: number }; Returns: Json }
+      get_user_avatar: { Args: never; Returns: Json }
       toggle_task_status: {
         Args: { p_completed: boolean; p_task_id: number }
         Returns: Json
