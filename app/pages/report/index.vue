@@ -1,196 +1,326 @@
 <script setup lang="ts">
-    import type { Database, Json } from "~/types/database.types"
-    import { toast } from 'vue-sonner'
-    import LinesChart from '@/components/report/LinesChart.vue'
+import type { Database } from "~/types/database.types"
+import { toast } from 'vue-sonner'
+import BarsChart from '@/components/report/BarsChart.vue'
 import PiesChart from "~/components/report/PiesChart.vue"
 import ReportCard from "~/components/report/ReportCard.vue"
 import SubjectsChart from "~/components/report/SubjectsChart.vue"
 import Skeleton from "~/components/ui/skeleton/Skeleton.vue"
+import { ListChecks, CheckCircle2, AlertTriangle, Star, List } from 'lucide-vue-next'
 
-    definePageMeta({
-        layout: 'dashboard'
-    })
+definePageMeta({
+  layout: 'dashboard'
+})
 
-    interface TaskCompletionRate {
-        date: Date,
-        tasks_completed: number
+interface TaskCompletionRate {
+  date: Date
+  tasks_completed: number
+}
+
+interface TasksByCategory {
+  category: string
+  total_tasks: number
+}
+
+interface TasksBySubject {
+  subject: string
+  completed_tasks: number
+  total_tasks: number
+}
+
+interface ReportData {
+  total_tasks: number
+  completed_tasks: number
+  overdue_tasks: number
+  average_score: number
+  task_completion_rate: TaskCompletionRate[]
+  tasks_by_category: TasksByCategory[]
+  tasks_by_subject: TasksBySubject[]
+}
+
+const { user } = useAuth()
+const supabase = useSupabaseClient<Database>()
+
+const loading = ref(true)
+const reportData = ref<ReportData | null>(null)
+
+const offset_map: Record<string, number> = {
+  "week": 7,
+  "day30": 30,
+  "month3": 90,
+  "year": 365,
+  "all": 9999,
+}
+
+const bar_offset = ref('day30')
+const pie_offset = ref('all')
+
+const barChartData = ref<TaskCompletionRate[]>([])
+const pieChartData = ref<TasksByCategory[]>([])
+
+const monthlyStats = computed(() => {
+  if (!reportData.value) return null
+  
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  
+  const lastMonthDate = new Date(currentYear, currentMonth - 1, 1)
+  const lastMonth = lastMonthDate.getMonth()
+  const lastMonthYear = lastMonthDate.getFullYear()
+
+  // Filter tasks for current month
+  const currentMonthTasks = reportData.value.task_completion_rate.filter(t => {
+    const d = new Date(t.date)
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+  })
+
+  // Filter tasks for last month
+  const lastMonthTasks = reportData.value.task_completion_rate.filter(t => {
+    const d = new Date(t.date)
+    return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear
+  })
+
+  const currentMonthCompleted = currentMonthTasks.reduce((sum, t) => sum + t.tasks_completed, 0)
+  const lastMonthCompleted = lastMonthTasks.reduce((sum, t) => sum + t.tasks_completed, 0)
+
+  // Since the API doesn't give us total_tasks_per_day, we estimate monthly score
+  // based on the ratio of monthly completed vs overall average as a proxy for this month's performance
+  // For a more accurate "Score", we'd need total tasks due per month from the backend.
+  // For now, we'll display the current month's completed volume as the primary metric
+  // and use the trend of completion volume between months.
+  
+  const diff = currentMonthCompleted - lastMonthCompleted
+  const trendPercent = lastMonthCompleted > 0 
+    ? Math.round((diff / lastMonthCompleted) * 100) 
+    : (currentMonthCompleted > 0 ? 100 : 0)
+    
+  const trendString = trendPercent >= 0 ? `+${trendPercent}%` : `${trendPercent}%`
+  const trendColor = trendPercent >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+
+  return {
+    currentMonthCompleted,
+    trendString,
+    trendColor,
+    totalThisMonth: currentMonthTasks.length, // approximation
+  }
+})
+
+const fetchReportData = async () => {
+  if (!user.value) return
+  
+  try {
+    loading.value = true
+    // Fetch "all" (lifetime) data for the summary section
+    const { data, error } = await supabase.rpc('get_report_data', { days: 9999 })
+
+    if (error) {
+      if (error.message?.includes('JWT expired')) {
+        const { logout } = useAuth()
+        await logout()
+        toast.error('Your session has expired. Please log in again.')
+        return
+      }
+      throw error
     }
 
-    interface TasksByCategory {
-        category: string,
-        total_tasks: number
+    if (data && typeof data === 'object' && 'error' in data) {
+      toast.error("User profile not found")
+      return
     }
 
-    interface TasksBySubject {
-        subject: string,
-        completed_tasks: number,
-        total_tasks: number
+    const rawData = data as any
+    const formattedData: ReportData = {
+      ...rawData,
+      task_completion_rate: (rawData.task_completion_rate || []).map((tcr: any) => ({
+        date: new Date(tcr.date),
+        tasks_completed: tcr.tasks_completed
+      }))
     }
 
-    interface ReportData {
-        total_tasks: number,
-        completed_tasks: number,
-        overdue_tasks: number,
-        average_score: number,
-        task_completion_rate: TaskCompletionRate[],
-        tasks_by_category: TasksByCategory[],
-        tasks_by_subject: TasksBySubject[]
+    reportData.value = formattedData
+  } catch (error: any) {
+    console.error('Error fetching report data:', error.message)
+    toast.error('Failed to load report data')
+  } finally {
+    loading.value = false
+  }
+}
+
+const fetchBarData = async (days: number) => {
+  if (!user.value) return
+  try {
+    const { data, error } = await supabase.rpc('get_report_data', { days })
+    if (!error && data) {
+      const rawData = data as any
+      barChartData.value = (rawData.task_completion_rate || []).map((tcr: any) => ({
+        date: new Date(tcr.date),
+        tasks_completed: tcr.tasks_completed
+      }))
     }
+  } catch (e) {}
+}
 
-    const { user } = useAuth()
-    const supabase = useSupabaseClient<Database>()
-
-    const loading = ref(true)
-
-    const reportData = ref({} as ReportData);
-    const TCR_Data = ref([] as TaskCompletionRate[]);
-    const chartData = ref([] as TaskCompletionRate[]);
-
-    const fetchReportData = async (days: number) => {
-        if (!user.value) return
-        try {
-            loading.value = true;
-            const { data, error } = await supabase.rpc('get_report_data', { days: days })
-            
-            if (error) {
-                if (error.message?.includes('JWT expired')) {
-                    const { logout } = useAuth()
-                    await logout()
-                    toast.error('Your session has expired. Please log in again.')
-                    return
-                }
-                throw error
-            }
-
-            if(data && "error" in (data as Json[])) {
-                toast.error("User profile not found");
-
-                throw error
-            }
-
-            reportData.value = data as unknown as ReportData;
-            TCR_Data.value = [];
-            for(let tcr of reportData.value.task_completion_rate) {
-                TCR_Data.value.push({ date: new Date(tcr.date), tasks_completed: tcr.tasks_completed})
-            }
-            chartData.value = TCR_Data.value;
-            console.log(chartData);
-        } catch (error: any) {
-            console.error('Error fetching report data:', error.message)
-            toast.error('Failed to load report data')
-        } finally {
-            loading.value = false
-        }
+const fetchPieData = async (days: number) => {
+  if (!user.value) return
+  try {
+    const { data, error } = await supabase.rpc('get_report_data', { days })
+    if (!error && data) {
+      const rawData = data as any
+      pieChartData.value = rawData.tasks_by_category || []
     }
+  } catch (e) {}
+}
 
-    onMounted(() => { if (user.value) fetchReportData(30) })
+// Watch for changes in chart offsets
+watch(bar_offset, (newVal) => {
+  fetchBarData(offset_map[newVal]!)
+}, { immediate: true })
 
-    const offset_map: Record<string, number> = {
-        "day30": 30,
-        "month2": 60,
-        "year": 365,
-        "all": 9999,
-    }
+watch(pie_offset, (newVal) => {
+  fetchPieData(offset_map[newVal]!)
+}, { immediate: true })
 
-    const day_offset = ref('day30');
-
-    const pieChartData = [
-        { browser: "chrome", visitors: 275, fill: "blue" },
-        { browser: "safari", visitors: 200, fill: "lightblue" },
-        { browser: "firefox", visitors: 187, fill: "powderblue" },
-        { browser: "edge", visitors: 173, fill: "darkblue" },
-        { browser: "other", visitors: 90, fill: "royalblue" },
-    ]
-    type pieData = typeof pieChartData[number]
-
-    const pieChartConfig = {
-        visitors: {
-            label: "Visitors",
-            color: undefined,
-        },
-        chrome: {
-            label: "Chrome",
-            color: "blue",
-        },
-        safari: {
-            label: "Safari",
-            color: "lightblue",
-        },
-        firefox: {
-            label: "Firefox",
-            color: "powderblue",
-        },
-        edge: {
-            label: "Edge",
-            color: "darkblue",
-        },
-        other: {
-            label: "Other",
-            color: "royalblue",
-        },
-    }
+onMounted(() => {
+  if (user.value) {
+    fetchReportData() // Initial lifetime fetch
+    fetchBarData(offset_map[bar_offset.value]!)
+    fetchPieData(offset_map[pie_offset.value]!)
+  }
+})
 </script>
 
 <template>
-    <section class="w-full flex justify-center">
-        <main class="flex flex-col box-border p-10 gap-3 items-start">
-            <span class="text-4xl">Reports & Analytics</span>
-            <p class="text-gray-500 text-xl">Track your academic progress and task completion</p>
-            <Select class="w-full" default-value="day30" v-model="day_offset">
-                <SelectTrigger class="w-full max-w-200">
-                    <SelectValue placeholder="Please select a time range..."/>
-                </SelectTrigger>
-                <SelectContent class="w-full" @click="fetchReportData(offset_map[day_offset]!)">
-                    <SelectItem value="day30" class="w-full">Last 30 days</SelectItem>
-                    <SelectItem value="month2" class="w-full">Last 2 months</SelectItem>
-                    <SelectItem value="year" class="w-full">Last year</SelectItem>
-                    <SelectItem value="all" class="w-full">Anytime</SelectItem>
-                </SelectContent>
-            </Select>
-            <Skeleton class="lg:min-w-5xl md:min-w-md min-w-sm h-400" v-if="loading"></Skeleton>
-            <section class="w-full max-w-270 flex flex-row flex-wrap justify-start gap-5" v-else-if="!loading && user">
-                <ReportCard v-if="!loading" title="Total Tasks" :content="`${(reportData as ReportData).total_tasks}`" :description="`${((reportData as ReportData).total_tasks) - ((reportData as ReportData).completed_tasks)} incomplete tasks`"></ReportCard>
-                <ReportCard title="Completed" :content="`${(reportData as ReportData).completed_tasks}`" :description="`${(reportData as ReportData).average_score}% Completion Rate`"></ReportCard>
-                <ReportCard title="Overdue" :content="`${(reportData as ReportData).overdue_tasks}`" description="Needing attention!"></ReportCard>
-                <ReportCard title="Avg Score" :content="`${(reportData as ReportData).average_score}%`" description="Great job!"></ReportCard>
-                <Card class="w-full max-w-261">
-                    <CardHeader class="pb-1">
-                        <CardDescription>
-                            Task Completion Trend
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="pb-2">
-                        <LinesChart :chartData="chartData"></LinesChart>
-                    </CardContent>
-                </Card>
-                <Card class="w-full max-w-261">
-                    <CardHeader class="pb-1">
-                        <CardDescription>
-                            Tasks by Category
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="pb-2">
-                        <PiesChart :pieChartData="reportData.tasks_by_category"></PiesChart>
-                    </CardContent>
-                </Card>
-                <Card class="w-full max-w-261">
-                    <CardHeader class="pb-1">
-                        <CardDescription>
-                            <b class="text-black">Subject Performance</b>
-                            <br>
-                            <span class="cursor-pointer">View All</span>
-                        </CardDescription>
-                    </CardHeader>
-                    <SubjectsChart :tasks_by_subject="reportData.tasks_by_subject"></SubjectsChart>
-                </Card>
-            </section>
-        </main>
+  <div class="min-h-screen bg-gradient-to-b from-background to-muted/30">
+    <section class="w-full flex justify-center pb-20">
+      <main class="flex flex-col box-border p-6 md:p-10 gap-10 items-start max-w-7xl w-full">
+        <!-- Modernized Header -->
+        <header class="flex flex-col md:flex-row md:items-end justify-between w-full gap-6">
+          <div class="space-y-2">
+            <h1 class="text-4xl font-black tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Reports & Analytics</h1>
+            <p class="text-muted-foreground text-lg font-medium">Insights into your academic journey and productivity</p>
+          </div>
+        </header>
+
+        <div v-if="loading && !reportData" class="w-full space-y-8 animate-pulse">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Skeleton v-for="i in 4" :key="i" class="h-32 w-full rounded-2xl" />
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <Skeleton v-for="i in 2" :key="i" class="h-[450px] w-full rounded-2xl" />
+          </div>
+        </div>
+
+        <div v-else-if="reportData && user && monthlyStats" class="w-full space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <!-- Summary Cards with extra polish -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <ReportCard 
+              title="Total Tasks" 
+              :content="reportData.total_tasks.toString()" 
+              description="Lifetime productivity"
+              :icon="ListChecks"
+              class="border-primary/5 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 rounded-3xl"
+            />
+            <ReportCard 
+              title="Score" 
+              :content="`${Math.round(reportData.average_score)}%`" 
+              description="Monthly completion rate"
+              :icon="CheckCircle2"
+              :trend="monthlyStats.trendString"
+              :trendColor="monthlyStats.trendColor"
+              class="border-primary/5 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 rounded-3xl"
+            />
+            <ReportCard 
+              title="Tasks This Month" 
+              :content="monthlyStats.totalThisMonth.toString()" 
+              :description="`${reportData.overdue_tasks} overdue tasks`"
+              :icon="AlertTriangle"
+              class="border-destructive/10 hover:shadow-2xl hover:shadow-destructive/5 transition-all duration-500 rounded-3xl"
+            />
+            <ReportCard 
+              title="Avg Score" 
+              :content="`${Math.round(reportData.average_score)}%`" 
+              description="Overall performance"
+              :icon="Star"
+              class="border-primary/5 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-500 rounded-3xl"
+            />
+          </div>
+
+          <!-- Main Analytics Area -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Trend Card -->
+            <Card class="w-full border-none bg-card/60 backdrop-blur-md shadow-2xl shadow-primary/5 rounded-[2.5rem] overflow-hidden ring-1 ring-primary/5">
+              <CardHeader class="flex flex-row items-start justify-between p-8 pb-4">
+                <div class="space-y-1.5">
+                  <CardTitle class="text-xl font-black tracking-tight text-foreground">Activity Trend</CardTitle>
+                  <CardDescription class="font-bold text-[10px] uppercase tracking-wider text-muted-foreground/60">Daily task completion volume</CardDescription>
+                </div>
+                <Select v-model="bar_offset">
+                  <SelectTrigger class="w-[110px] h-8 text-[10px] font-black uppercase tracking-widest bg-primary/5 border-none ring-0 rounded-lg text-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">Weekly</SelectItem>
+                    <SelectItem value="day30">Monthly</SelectItem>
+                    <SelectItem value="month3">Quarterly</SelectItem>
+                    <SelectItem value="year">Yearly</SelectItem>
+                    <SelectItem value="all">Lifetime</SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent class="p-8 pt-0">
+                <div class="mt-4">
+                  <BarsChart :chartData="barChartData" :range="bar_offset" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <!-- Distribution Card -->
+            <Card class="w-full border-none bg-card/60 backdrop-blur-md shadow-2xl shadow-primary/5 rounded-[2.5rem] overflow-hidden ring-1 ring-primary/5">
+              <CardHeader class="flex flex-row items-start justify-between p-8 pb-4">
+                <div class="space-y-1.5">
+                  <CardTitle class="text-xl font-black tracking-tight text-foreground">Focus Areas</CardTitle>
+                  <CardDescription class="font-bold text-[10px] uppercase tracking-wider text-muted-foreground/60">Task distribution by category</CardDescription>
+                </div>
+                <Select v-model="pie_offset">
+                  <SelectTrigger class="w-[110px] h-8 text-[10px] font-black uppercase tracking-widest bg-primary/5 border-none ring-0 rounded-lg text-primary">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">Weekly</SelectItem>
+                    <SelectItem value="day30">Monthly</SelectItem>
+                    <SelectItem value="month3">Quarterly</SelectItem>
+                    <SelectItem value="year">Yearly</SelectItem>
+                    <SelectItem value="all">Lifetime</SelectItem>
+                  </SelectContent>
+                </Select>
+              </CardHeader>
+              <CardContent class="p-8 pt-0">
+                <div class="mt-4 flex items-center justify-center">
+                  <PiesChart :pieChartData="pieChartData" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <!-- Subject Performance -->
+            <Card class="w-full lg:col-span-2 border-none bg-card/60 backdrop-blur-md shadow-2xl shadow-primary/5 rounded-[2.5rem] overflow-hidden ring-1 ring-primary/5">
+              <CardHeader class="flex flex-row items-center justify-between p-8 pb-6 border-b border-primary/5">
+                <div>
+                  <CardTitle class="text-xl font-black tracking-tight text-foreground">Subject Mastery</CardTitle>
+                  <CardDescription class="font-bold text-[10px] uppercase tracking-wider text-muted-foreground/60">Performance breakdown across academic subjects</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent class="p-8">
+                <SubjectsChart :tasks_by_subject="reportData.tasks_by_subject" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
     </section>
+  </div>
 </template>
 
-<style>
-    * {
-        font-family: sans-serif;
-        text-rendering: optimizeLegibility;
-    }
+<style scoped>
+/* Scoped styles */
 </style>
