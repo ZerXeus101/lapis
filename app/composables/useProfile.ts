@@ -4,12 +4,14 @@ export const useProfile = () => {
   const supabase = useSupabaseClient<Database>()
   const user = useSupabaseUser()
   const { handleAuthError } = useAuth()
-  
-  // Shared state
+
+  /**
+   * We use a shared state via useState so that components can manually update it
+   * (e.g., the profile page updating the avatar after an upload).
+   */
   const profile = useState('profile-data', () => ({
     full_name: '',
-    avatar_url: null as string | null,
-    loading: true
+    avatar_url: null as string | null
   }))
 
   const resolveAvatarUrl = (path: string | null | undefined) => {
@@ -19,44 +21,50 @@ export const useProfile = () => {
     return data.publicUrl
   }
 
-  const fetchProfile = async (force = false) => {
-    if (!user.value?.id) return
-    if (!force && profile.value.full_name) return // Already fetched
+  /**
+   * useAsyncData handles the automatic fetching and SSR/hydration logic.
+   * It populates the shared 'profile' state.
+   */
+  const { refresh: fetchProfile, status } = useAsyncData(
+    'profile-async-fetch',
+    async () => {
+      if (!user.value?.id) return null
 
-    try {
-      profile.value.loading = true
-      // We fetch the basic user info from the public.User table
-      const { data, error } = await supabase
-        .from('User')
-        .select('full_name, avatar_url, profile_pic_url')
-        .eq('auth_uid', user.value.id)
-        .maybeSingle() // Use maybeSingle to avoid errors if user doesn't exist yet
+      try {
+        const { data, error } = await supabase
+          .from('User')
+          .select('full_name, avatar_url, profile_pic_url')
+          .eq('auth_uid', user.value.id)
+          .maybeSingle()
 
-      if (error) {
-        const wasExpired = await handleAuthError(error)
-        if (wasExpired) return
-        throw error
+        if (error) {
+          await handleAuthError(error)
+          return null
+        }
+
+        if (data) {
+          profile.value.full_name = data.full_name || ''
+          profile.value.avatar_url = resolveAvatarUrl(data.avatar_url || data.profile_pic_url)
+        }
+        
+        return data
+      } catch (e) {
+        console.error('Error in useProfile async data:', e)
+        return null
       }
-
-      if (data) {
-        profile.value.full_name = data.full_name || ''
-        profile.value.avatar_url = resolveAvatarUrl(data.avatar_url || data.profile_pic_url)
-      }
-    } catch (e) {
-      console.error('Error fetching profile for sync:', e)
-    } finally {
-      profile.value.loading = false
+    },
+    {
+      watch: [user],
+      immediate: true
     }
-  }
+  )
 
-  // Watch for user changes (e.g. after login)
-  watch(user, (newUser) => {
-    if (newUser?.id) fetchProfile()
-  }, { immediate: true })
+  const loading = computed(() => status.value === 'pending')
 
   return {
     profile,
     fetchProfile,
+    loading,
     resolveAvatarUrl
   }
 }

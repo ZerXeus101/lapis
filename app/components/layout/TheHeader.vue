@@ -26,7 +26,7 @@ const isSheetOpen = ref(false)
 const navItems = [
   { label: 'Profile', icon: User, href: '/profile' },
   { label: 'Calendar', icon: Calendar, href: '/calendar' },
-  { label: 'Reports', icon: FilePieChart, href: '/reports' },
+  { label: 'Reports', icon: FilePieChart, href: '/report' },
 ]
 
 const emit = defineEmits<{
